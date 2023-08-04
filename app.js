@@ -2,6 +2,7 @@ const express = require("express");
 const app = express();
 
 const dotenv = require("dotenv");
+const cookieParser = require("cookie-parser");
 
 const connectDatabase = require("./config/database");
 const errorMiddleware = require("./middlewares/errors");
@@ -24,10 +25,15 @@ connectDatabase();
 // Configurando o body parser
 app.use(express.json());
 
+// Configurando o cookie parser
+app.use(cookieParser());
+
 // Importando todos os arquivos de rotas
 const jobs = require("./routes/jobs");
+const auth = require("./routes/auth");
 
 app.use("/api/v1", jobs);
+app.use("/api/v1", auth);
 
 // Cuidando de routes não tratadas
 app.all("*", (req, res, next) => {
