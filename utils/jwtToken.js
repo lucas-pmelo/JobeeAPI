@@ -2,7 +2,6 @@
 const sendToken = (user, statusCode, res) => {
     // Criando o token JWT
     const token = user.getJwtToken();
-    console.log(user);
 
     // Opções para o cookie
     const options = {

@@ -6,6 +6,7 @@ const ErrorHandler = require("../utils/errorHandler");
 const catchAsyncErrors = require("../middlewares/catchAsyncErrors");
 
 const APIFilters = require("../utils/apiFilters");
+const path = require("path");
 
 // Pega todos os jovs => /api/v1/jobs
 exports.getJobs = catchAsyncErrors(async (req, res, next) => {
@@ -143,5 +144,87 @@ exports.jobStats = catchAsyncErrors(async (req, res, next) => {
     res.status(200).json({
         success: true,
         data: stats
+    });
+});
+
+// Aplicar para um job usando Resume => /api/v1/job/:id/apply
+exports.applyJob = catchAsyncErrors(async (req, res, next) => {
+    let job = await Job.findById(req.params.id).select("+applicantsApplied");
+
+    if (!job) {
+        return next(new ErrorHandler("Job not found", 404));
+    }
+
+    // Checar se o usuário aplicou para um job vencido
+    if (job.lastDate < Date.now()) {
+        return next(new ErrorHandler("Job application date is expired", 400));
+    }
+
+    // Checando se o usuario aplicou anteriormente
+    for (let i = 0; i < job.applicantsApplied.length; i++) {
+        if (job.applicantsApplied[i].id === req.user._id) {
+            return next(
+                new ErrorHandler("You have already applied to this job", 400)
+            );
+        }
+    }
+
+    job = await Job.find({
+        "applicantsApplied.id": req.user._id
+    }).select("+applicantsApplied");
+
+    // Checando os arquivos
+    if (!req.files) {
+        return next(new ErrorHandler("Please upload your resume", 400));
+    }
+
+    const file = req.files.file;
+
+    // Checando o tipo de arquivo
+    const supportedFiles = /.pdf|.docx|.doc/;
+    if (!supportedFiles.test(path.extname(file.name))) {
+        return next(new ErrorHandler("Please upload a valid resume", 400));
+    }
+
+    // Checando o tamanho do arquivo
+    if (file.size > process.env.MAX_FILE_SIZE) {
+        return next(
+            new ErrorHandler("Please upload a resume less than 5MB", 400)
+        );
+    }
+
+    // Renomeando o arquivo
+    file.name = `${req.user.name.replace(" ", "_")}_${job._id}${
+        path.parse(file.name).ext
+    }`;
+
+    file.mv(`${process.env.UPLOAD_PATH}/${file.name}`, async (err) => {
+        if (err) {
+            console.log(err);
+            return next(new ErrorHandler("Resume upload failed", 500));
+        }
+
+        await Job.findByIdAndUpdate(
+            req.params.id,
+            {
+                $push: {
+                    applicantsApplied: {
+                        id: req.user._id,
+                        resume: file.name
+                    }
+                }
+            },
+            {
+                new: true,
+                runValidators: true,
+                useFindAndModify: false
+            }
+        );
+
+        res.status(200).json({
+            success: true,
+            message: "Applied to job successfully",
+            data: file.name
+        });
     });
 });

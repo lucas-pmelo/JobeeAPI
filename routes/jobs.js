@@ -9,7 +9,8 @@ const {
     getJobsInRadius,
     updateJob,
     deleteJob,
-    jobStats
+    jobStats,
+    applyJob
 } = require("../controllers/jobsController");
 
 const { isAuthenticatedUser, authorizeRoles } = require("../middlewares/auth");
@@ -23,6 +24,10 @@ router.route("/stats/:topic").get(jobStats);
 router
     .route("/job/new")
     .post(isAuthenticatedUser, authorizeRoles("employer", "admin"), newJob);
+
+router
+    .route("/job/:id/apply")
+    .put(isAuthenticatedUser, authorizeRoles("user"), applyJob);
 
 router
     .route("/job/:id")

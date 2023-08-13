@@ -3,6 +3,7 @@ const app = express();
 
 const dotenv = require("dotenv");
 const cookieParser = require("cookie-parser");
+const fileUpload = require("express-fileupload");
 
 const connectDatabase = require("./config/database");
 const errorMiddleware = require("./middlewares/errors");
@@ -28,12 +29,17 @@ app.use(express.json());
 // Configurando o cookie parser
 app.use(cookieParser());
 
+// Configurando o file upload
+app.use(fileUpload());
+
 // Importando todos os arquivos de rotas
 const jobs = require("./routes/jobs");
 const auth = require("./routes/auth");
+const user = require("./routes/user");
 
 app.use("/api/v1", jobs);
 app.use("/api/v1", auth);
+app.use("/api/v1", user);
 
 // Cuidando de routes não tratadas
 app.all("*", (req, res, next) => {
