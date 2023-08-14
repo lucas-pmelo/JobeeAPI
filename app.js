@@ -4,6 +4,15 @@ const app = express();
 const dotenv = require("dotenv");
 const cookieParser = require("cookie-parser");
 const fileUpload = require("express-fileupload");
+const rateLimit = require("express-rate-limit");
+const helmet = require("helmet");
+const mongoSanitize = require("express-mongo-sanitize");
+const xssClean = require("xss-clean");
+const hpp = require("hpp");
+const cors = require("cors");
+const bodyParser = require("body-parser");
+const swaggerUi = require("swagger-ui-express");
+const swaggerDocument = require("./swagger.json");
 
 const connectDatabase = require("./config/database");
 const errorMiddleware = require("./middlewares/errors");
@@ -24,6 +33,15 @@ process.on("uncaughtException", (err) => {
 connectDatabase();
 
 // Configurando o body parser
+app.use(bodyParser.urlencoded({ extended: true }));
+
+// Configurando o swagger
+app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerDocument));
+
+// Configurando o helmet
+app.use(helmet());
+
+// Configurando o body parser
 app.use(express.json());
 
 // Configurando o cookie parser
@@ -31,6 +49,30 @@ app.use(cookieParser());
 
 // Configurando o file upload
 app.use(fileUpload());
+
+// Configurando o express mongo sanitize
+app.use(mongoSanitize());
+
+// Configurando o xss clean
+app.use(xssClean());
+
+// Configurando o hpp
+app.use(
+    hpp({
+        whitelist: ["positions"]
+    })
+);
+
+// Configurando o rate limit
+const limiter = rateLimit({
+    windowMs: 10 * 60 * 1000, // 10 minutos
+    max: 100 // 100 requisições
+});
+
+// Configurando o cors
+app.use(cors());
+
+app.use(limiter);
 
 // Importando todos os arquivos de rotas
 const jobs = require("./routes/jobs");

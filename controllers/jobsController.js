@@ -7,6 +7,7 @@ const catchAsyncErrors = require("../middlewares/catchAsyncErrors");
 
 const APIFilters = require("../utils/apiFilters");
 const path = require("path");
+const fs = require("fs");
 
 // Pega todos os jovs => /api/v1/jobs
 exports.getJobs = catchAsyncErrors(async (req, res, next) => {
@@ -44,6 +45,9 @@ exports.newJob = catchAsyncErrors(async (req, res, next) => {
 exports.getJob = catchAsyncErrors(async (req, res, next) => {
     const job = await Job.find({
         $and: [{ _id: req.params.id }, { slug: req.params.slug }]
+    }).populate({
+        path: "user",
+        select: "name"
     });
 
     if (!job || job.length === 0) {
@@ -64,6 +68,13 @@ exports.updateJob = catchAsyncErrors(async (req, res, next) => {
         return next(new ErrorHandler("Job not found", 404));
     }
 
+    // Checando se o usuario é o criador do job
+    if (job.user.toString() !== req.user.id && req.user.role !== "admin") {
+        return next(
+            new ErrorHandler("You are not authorized to update this job", 401)
+        );
+    }
+
     job = await Job.findByIdAndUpdate(req.params.id, req.body, {
         new: true,
         runValidators: true
@@ -78,10 +89,33 @@ exports.updateJob = catchAsyncErrors(async (req, res, next) => {
 
 // Deletar um job => /api/v1/job/:id
 exports.deleteJob = catchAsyncErrors(async (req, res, next) => {
-    const job = await Job.findById(req.params.id);
+    const job = await Job.findById(req.params.id).select(+applicantsApplied);
 
     if (!job) {
         return next(new ErrorHandler("Job not found", 404));
+    }
+
+    // Checando se o usuario é o criador do job
+    if (job.user.toString() !== req.user.id && req.user.role !== "admin") {
+        return next(
+            new ErrorHandler("You are not authorized to delete this job", 401)
+        );
+    }
+
+    // Deletando arquivos relacionados ao job
+
+    for (let i = 0; i < job.applicantsApplied.length; i++) {
+        let filepath =
+            `${__dirname}/public/uploads/${job.applicantsApplied[i].resume}`.replace(
+                "\\controllers",
+                ""
+            );
+
+        fs.unlink(filepath, (err) => {
+            if (err) {
+                console.log(err);
+            }
+        });
     }
 
     await Job.findByIdAndDelete(req.params.id);
@@ -162,16 +196,16 @@ exports.applyJob = catchAsyncErrors(async (req, res, next) => {
 
     // Checando se o usuario aplicou anteriormente
     for (let i = 0; i < job.applicantsApplied.length; i++) {
-        if (job.applicantsApplied[i].id === req.user._id) {
+        if (job.applicantsApplied[i].id === req.user.id) {
             return next(
                 new ErrorHandler("You have already applied to this job", 400)
             );
         }
     }
 
-    job = await Job.find({
-        "applicantsApplied.id": req.user._id
-    }).select("+applicantsApplied");
+    // job = await Job.find({ "applicantsApplied.id": req.user.id }).select(
+    //     "+applicantsApplied"
+    // );
 
     // Checando os arquivos
     if (!req.files) {
