@@ -5,8 +5,10 @@
 ## Install all Dependencies
 
 ```
-npm i
+npm install
 ```
+## Documentation
+https://documenter.getpostman.com/view/28755125/2s9Xy6ooyJ
 
 ## Config.env
 
